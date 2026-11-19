@@ -159,9 +159,9 @@ ANGLE = 17.5        # degrees; turn of the grid so it follows the streets south 
 What the code does, step by step:
 
 1. It reads the corner points of the working area (the curve is wired into its input).
-2. It makes two directions for a grid that is turned by `ANGLE`: `along` (roughly east) and `across` (roughly south). The streets south of the site run at about 17.5°, so the voxels line up with them instead of with north.
-3. It measures how far the working area reaches in each of these two directions, and from that how many voxels are needed (`count_u` × `count_w`) to cover all of it. The number of floors is `HEIGHT / VOXEL_SIZE` = 20.
-4. Three loops (floor, column, row) make one point per voxel. The `+ 0.5` puts the point in the centre of the voxel, so floor 0 sits on the ground (its centre is at Y = 1.5 m).
+2. It makes two directions for a grid that is turned by `ANGLE`: `along_direction` (roughly east) and `across_direction` (roughly south). The streets south of the site run at about 17.5°, so the voxels line up with them instead of with north.
+3. It measures how far the working area reaches in each of these two directions, and from that how many voxels are needed (`column_count` × `row_count`) to cover all of it. The number of floors is `floor_count = HEIGHT / VOXEL_SIZE` = 20.
+4. Three loops (`floor`, `column`, `row`) make one point per voxel. The `+ 0.5` puts the point in the centre of the voxel, so floor 0 sits on the ground (its centre is at Y = 1.5 m).
 5. Every point gets:
    - `floor`: the floor number (0 = ground floor),
    - `orient`: a rotation (quaternion) of `ANGLE` around the Y axis, so the cube placed on it is turned with the grid,
