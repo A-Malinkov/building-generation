@@ -180,17 +180,31 @@ The grid covers the rectangle around the working area, so there are more voxels 
 **6. `add_parking_levels`** (Python) adds parking levels **under** the ground, with the same footprint as the ground floor. Its inputs are at the top of the code:
 
 ```python
-BIKE_LEVELS = 1
-CAR_LEVELS = 2
+BIKE_LEVELS = 1                 # number of bike parking levels
+CAR_LEVELS = 2                  # number of car parking levels (under the bike parking)
 BIKE_COLOUR = (0.2, 0.4, 1.0)   # blue
 CAR_COLOUR = (0.5, 0.5, 0.5)    # gray
 ```
 
 1. It takes every voxel on floor 0 (505 voxels), so the levels follow the working area outline automatically.
-2. For every level under the ground it copies these voxels `voxel_size` (3 m) lower per level, with all their attributes, and sets `floor` to −1, −2, −3.
+2. For every level under the ground it copies these voxels `voxel_size` (3 m) lower per level. Each copy keeps the `orient` of the ground floor voxel and gets `floor` −1, −2 or −3.
 3. The first `BIKE_LEVELS` levels are bike parking: colour `BIKE_COLOUR` and group `bike_parking` (505 voxels). The `CAR_LEVELS` levels below them are car parking: colour `CAR_COLOUR` and group `car_parking` (1,010 voxels).
 
 Together with the floors above ground that gives **11,615 voxels**. The lowest level has its centre at Y = −7.5 m.
+
+**`parking_table`** (Python, a side branch of `add_parking_levels`, not shown in the viewport) estimates how many bikes and cars fit. Inputs at the top of the code:
+
+```python
+AREA_PER_BIKE = 0.95   # m2, two-tier bike racks
+AREA_PER_CAR = 30.0    # m2, garage with an irregular outline
+```
+
+These are rough gross areas per space, including aisles, ramps and cores. The function `count_voxels_and_levels` counts the voxels in `bike_parking` and `car_parking` and on how many floors they are. Then `add_row` multiplies the voxel count by the voxel area (3 × 3 = 9 m²), divides by the area per space and rounds down to whole spaces. The result is one point per row; click the node and open the Geometry Spreadsheet (Points):
+
+| parking | levels | area_m2 | area_per_space | spaces |
+|---|---|---|---|---|
+| bike | 1 | 4,545 | 0.95 | 4,784 |
+| car | 2 | 9,090 | 30 | 303 |
 
 **7. `one_voxel_cube`** (Box) is one cube. Its size is not typed in: it reads `voxel_size` from `make_voxel_grid` with the expression `detail("../make_voxel_grid", "voxel_size", 0)`, so the cubes always have the same size as the voxels and touch each other.
 
@@ -211,6 +225,7 @@ Everything below updates the whole model automatically.
 | Building height | `VOXELS/make_voxel_grid` → `HEIGHT` | number of floors = `HEIGHT / VOXEL_SIZE` |
 | Direction of the grid | `VOXELS/make_voxel_grid` → `ANGLE` | 0 = aligned with east-west; 17.5 = along the streets |
 | Parking levels | `VOXELS/add_parking_levels` → `BIKE_LEVELS`, `CAR_LEVELS` | number of bike levels (top) and car levels (below them) under the ground |
+| Area per parking space | `VOXELS/parking_table` → `AREA_PER_BIKE`, `AREA_PER_CAR` | m² per space, including aisles and ramps |
 | Colours | `make_voxel_grid` → `ABOVE_GROUND_COLOUR`, `add_parking_levels` → `BIKE_COLOUR`, `CAR_COLOUR` | RGB values from 0 to 1 |
 
 Useful places to look in Houdini:
