@@ -33,7 +33,7 @@ Nothing is placed by hand. Change an input (the outline of the working area, the
 4. In the viewport you see:
    - the green ground (SITE),
    - the grey buildings around the site (SURROUNDINGS),
-   - the voxels coloured from blue (ground floor) to red (top floor), with the working area outline in red (VOXELS).
+   - the voxels above ground in beige, three parking levels under the ground (bike parking blue, car parking gray), and the working area outline in red (VOXELS). The parking levels are under the ground surface, so look from below or hide SITE to see them.
 5. The first time, loading takes a few seconds: Houdini reads the 27 MB height map and turns it into 160,000 polygons.
 
 All file paths in the Houdini file start with `$HIP` (= the folder the `.hipnc` file is in). Keep the `data` folder next to the `.hipnc` file and it works on any computer.
@@ -128,10 +128,10 @@ How the OBJ is made (`data/3dbag/convert_3dbag_to_obj.py`, run with `python3 con
 ### VOXELS: the building volume
 
 ```
-working_area ──> make_voxel_grid ──> inside_plot ──> keep_inside_plot ──> cube_on_every_point ──> voxels_and_plot ──> OUT_VOXELS
-     │                                   ▲                                       ▲                      ▲
-     └──> plot_volume ───────────────────┘                    one_voxel_cube ────┘                      │
-     └──> plot_red ─────────────────────────────────────────────────────────────────────────────────────┘
+working_area ──> make_voxel_grid ──> inside_plot ──> keep_inside_plot ──> add_parking_levels ──> cube_on_every_point ──> voxels_and_plot ──> OUT_VOXELS
+     │                                   ▲                                                              ▲                      ▲
+     └──> plot_volume ───────────────────┘                                           one_voxel_cube ────┘                      │
+     └──> plot_red ────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 **1. `working_area`** (Curve) is the outline of the area we build on, as a closed curve on the ground (Y = 0). It is everything that is not already taken:
@@ -154,6 +154,7 @@ It started from the cadastral parcels of the open plot (Kadaster, about 8,265 m�
 VOXEL_SIZE = 3.0    # metres; one voxel = one 3x3x3 m block (3 m ~ one storey)
 HEIGHT = 60.0       # max building height (m) -> 20 floors
 ANGLE = 17.5        # degrees; turn of the grid so it follows the streets south of the site
+ABOVE_GROUND_COLOUR = (0.85, 0.82, 0.75)   # neutral beige, so the parking levels stand out
 ```
 
 What the code does, step by step:
@@ -165,7 +166,7 @@ What the code does, step by step:
 5. Every point gets:
    - `floor`: the floor number (0 = ground floor),
    - `orient`: a rotation (quaternion) of `ANGLE` around the Y axis, so the cube placed on it is turned with the grid,
-   - `Cd`: a colour from blue (ground floor) to red (top floor), so floors are easy to see.
+   - `Cd`: the colour `ABOVE_GROUND_COLOUR` (beige), so the blue and gray parking levels stand out.
 6. It stores `voxel_size` on the geometry (Detail attribute), so other nodes can read it.
 
 The grid covers the rectangle around the working area, so there are more voxels than needed. The next nodes remove the ones outside.
@@ -176,11 +177,26 @@ The grid covers the rectangle around the working area, so there are more voxels 
 
 **5. `keep_inside_plot`** (Blast) deletes every point that is **not** in `inside_plot` (Delete Non Selected). What is left are only the voxels in the working area: **10,100 voxels** (505 per floor × 20 floors).
 
-**6. `one_voxel_cube`** (Box) is one cube. Its size is not typed in: it reads `voxel_size` from `make_voxel_grid` with the expression `detail("../make_voxel_grid", "voxel_size", 0)`, so the cubes always have the same size as the voxels and touch each other.
+**6. `add_parking_levels`** (Python) adds parking levels **under** the ground, with the same footprint as the ground floor. Its inputs are at the top of the code:
 
-**7. `cube_on_every_point`** (Copy to Points) puts one cube on every voxel point. It uses the `orient` attribute to turn each cube with the grid, and copies `Cd` and `floor` from the points onto the cubes.
+```python
+BIKE_LEVELS = 1
+CAR_LEVELS = 2
+BIKE_COLOUR = (0.2, 0.4, 1.0)   # blue
+CAR_COLOUR = (0.5, 0.5, 0.5)    # gray
+```
 
-**8. `plot_red`** colours the working area outline red, and **`voxels_and_plot`** (Merge) puts the cubes and the outline together. **`OUT_VOXELS`** is the end of the chain.
+1. It takes every voxel on floor 0 (505 voxels), so the levels follow the working area outline automatically.
+2. For every level under the ground it copies these voxels `voxel_size` (3 m) lower per level, with all their attributes, and sets `floor` to −1, −2, −3.
+3. The first `BIKE_LEVELS` levels are bike parking: colour `BIKE_COLOUR` and group `bike_parking` (505 voxels). The `CAR_LEVELS` levels below them are car parking: colour `CAR_COLOUR` and group `car_parking` (1,010 voxels).
+
+Together with the floors above ground that gives **11,615 voxels**. The lowest level has its centre at Y = −7.5 m.
+
+**7. `one_voxel_cube`** (Box) is one cube. Its size is not typed in: it reads `voxel_size` from `make_voxel_grid` with the expression `detail("../make_voxel_grid", "voxel_size", 0)`, so the cubes always have the same size as the voxels and touch each other.
+
+**8. `cube_on_every_point`** (Copy to Points) puts one cube on every voxel point. It uses the `orient` attribute to turn each cube with the grid, and copies `Cd` and `floor` from the points onto the cubes.
+
+**9. `plot_red`** colours the working area outline red, and **`voxels_and_plot`** (Merge) puts the cubes and the outline together. **`OUT_VOXELS`** is the end of the chain.
 
 ---
 
@@ -194,10 +210,12 @@ Everything below updates the whole model automatically.
 | Voxel size | `VOXELS/make_voxel_grid` → `VOXEL_SIZE` | e.g. 1.5 for half-size voxels (8 × more voxels). The cubes follow automatically. |
 | Building height | `VOXELS/make_voxel_grid` → `HEIGHT` | number of floors = `HEIGHT / VOXEL_SIZE` |
 | Direction of the grid | `VOXELS/make_voxel_grid` → `ANGLE` | 0 = aligned with east-west; 17.5 = along the streets |
+| Parking levels | `VOXELS/add_parking_levels` → `BIKE_LEVELS`, `CAR_LEVELS` | number of bike levels (top) and car levels (below them) under the ground |
+| Colours | `make_voxel_grid` → `ABOVE_GROUND_COLOUR`, `add_parking_levels` → `BIKE_COLOUR`, `CAR_COLOUR` | RGB values from 0 to 1 |
 
 Useful places to look in Houdini:
 
-- **Geometry Spreadsheet** (tab next to the Scene View): click `keep_inside_plot` and choose *Points* to see every voxel with its `floor`, `orient` and `Cd`. The *Detail* view shows `voxel_size`.
+- **Geometry Spreadsheet** (tab next to the Scene View): click `add_parking_levels` and choose *Points* to see every voxel with its `floor`, `orient` and `Cd`. The *Detail* view shows `voxel_size`.
 - **Frame the building**: select `VOXELS` at `/obj` level and press **F** in the viewport.
 
 ---
